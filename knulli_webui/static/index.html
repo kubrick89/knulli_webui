@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Knulli WebUI</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='6' width='20' height='12' rx='6' fill='%237c5cff'/%3E%3Cpath d='M7 10v4M5 12h4' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='11' r='1.3' fill='white'/%3E%3Ccircle cx='18' cy='13.5' r='1.3' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="6"/><path d="M7 10v4M5 12h4"/><circle cx="16" cy="11" r="1"/><circle cx="18" cy="13.5" r="1"/></svg>
+    <span class="brand-name">Knulli WebUI</span>
+    <span id="hostname" class="muted"></span>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="dashboard">Dashboard</button>
+    <button class="tab" role="tab" data-tab="roms">ROMs</button>
+    <button class="tab" role="tab" data-tab="stats">Stats</button>
+    <button class="tab" role="tab" data-tab="saves">Saves</button>
+    <button class="tab" role="tab" data-tab="bios">BIOS</button>
+    <button class="tab" role="tab" data-tab="shots">Screenshots</button>
+    <button class="tab" role="tab" data-tab="remote">Remote</button>
+  </nav>
+  <div id="conn" class="conn" title="Connection status"><span class="dot"></span><span id="conn-text">…</span></div>
+</header>
+
+<main>
+  <!-- ============================ DASHBOARD ============================ -->
+  <section id="tab-dashboard" class="tab-panel" hidden>
+    <div id="kpis" class="kpis"></div>
+    <div class="cards">
+      <article class="card" id="card-system"><h2>System</h2><div class="body"></div></article>
+      <article class="card" id="card-activity"><h2>Activity</h2><div class="body"></div></article>
+      <article class="card" id="card-cpu"><h2>Processor</h2><div class="body"></div></article>
+      <article class="card" id="card-memory"><h2>Memory</h2><div class="body"></div></article>
+      <article class="card" id="card-power"><h2>Power and temperatures</h2><div class="body"></div></article>
+      <article class="card" id="card-network"><h2>Network</h2><div class="body"></div></article>
+      <article class="card" id="card-storage"><h2>Storage</h2><div class="body"></div></article>
+      <article class="card" id="card-library"><h2>ROM library</h2><div class="body"></div></article>
+    </div>
+  </section>
+
+  <!-- ============================== ROM =============================== -->
+  <section id="tab-roms" class="tab-panel" hidden>
+    <div class="toolbar">
+      <div class="segmented" id="rom-views">
+        <button data-view="systems">By system</button>
+        <button data-view="favorites">Favorites</button>
+        <button data-view="collections">Collections</button>
+        <button data-view="all">All</button>
+      </div>
+      <input type="search" id="f-search" placeholder="Search by name or file…" autocomplete="off">
+      <select id="f-sort" title="Sort order">
+        <option value="name">Name A→Z</option>
+        <option value="-name">Name Z→A</option>
+        <option value="system">System</option>
+        <option value="-year">Year (newest)</option>
+        <option value="year">Year (oldest)</option>
+        <option value="-rating">Rating</option>
+        <option value="-size">Size</option>
+        <option value="-playcount">Most played</option>
+        <option value="-lastplayed">Recently played</option>
+        <option value="-mtime">Recently added</option>
+      </select>
+      <div class="segmented" id="layout">
+        <button data-layout="grid" title="Grid">▦</button>
+        <button data-layout="table" title="List">☰</button>
+      </div>
+      <button id="btn-filters" class="btn">Filters <span id="filter-count" class="badge" hidden></span></button>
+      <span class="spacer"></span>
+      <button id="btn-refresh" class="btn" title="Rescan the ROM folders">⟳ Refresh</button>
+      <button id="btn-upload" class="btn primary">⇪ Upload ROMs</button>
+    </div>
+
+    <div class="rom-layout">
+      <aside id="filters" class="filters">
+        <div class="filters-head"><strong>Filters</strong><button id="btn-reset" class="link">Reset</button></div>
+        <label class="fld" id="fld-system">System<select id="f-system"></select></label>
+        <label class="fld" id="fld-collection">Collection<select id="f-collection"></select></label>
+        <label class="fld">Genre<select id="f-genre"></select></label>
+        <label class="fld">Developer<select id="f-developer"></select></label>
+        <label class="fld">Publisher<select id="f-publisher"></select></label>
+        <label class="fld">Region<select id="f-region"></select></label>
+        <div class="fld">Year
+          <div class="row2"><input type="number" id="f-year-from" placeholder="from" min="1950" max="2100"><input type="number" id="f-year-to" placeholder="to" min="1950" max="2100"></div>
+        </div>
+        <label class="fld">Players
+          <select id="f-players"><option value="">Any</option><option value="1">1+</option><option value="2">2+</option><option value="3">3+</option><option value="4">4+</option></select>
+        </label>
+        <label class="fld">Minimum rating
+          <select id="f-rating"><option value="">Any</option><option value="1">★ 1+</option><option value="2">★ 2+</option><option value="3">★ 3+</option><option value="4">★ 4+</option><option value="4.5">★ 4.5+</option></select>
+        </label>
+        <label class="fld">Play history
+          <select id="f-played"><option value="">All</option><option value="never">Never played</option><option value="played">Played</option></select>
+        </label>
+        <label class="fld">Metadata
+          <select id="f-meta"><option value="">All</option><option value="with">With metadata (scraped)</option><option value="without">Without metadata</option><option value="noimage">Without image</option></select>
+        </label>
+        <label class="fld">Visibility
+          <select id="f-hidden"><option value="">All</option><option value="visible">Visible only</option><option value="hidden">Hidden only</option></select>
+        </label>
+      </aside>
+
+      <div class="rom-main">
+        <div class="list-head">
+          <div id="breadcrumb" class="breadcrumb"></div>
+          <div id="result-info" class="muted"></div>
+          <span class="spacer"></span>
+          <div id="col-actions" class="col-actions" hidden></div>
+          <button id="btn-select-all" class="link">Select all</button>
+        </div>
+        <div id="es-notice" class="notice" hidden>
+          <span>EmulationStation shows new, renamed or re-enabled collections only after a restart.</span>
+          <button id="btn-es-restart" class="btn">⟳ Restart EmulationStation</button>
+        </div>
+        <div id="chips" class="chips"></div>
+        <div id="system-grid" class="system-grid"></div>
+        <div id="rom-list"></div>
+        <div id="sentinel"></div>
+        <div id="empty" class="empty" hidden></div>
+      </div>
+    </div>
+
+    <div id="bulkbar" class="bulkbar" hidden>
+      <span id="bulk-info"></span>
+      <span class="spacer"></span>
+      <button id="bulk-clear" class="btn">Clear</button>
+      <button id="bulk-fav" class="btn" title="Add the selected ROMs to favorites">★ Favorite</button>
+      <button id="bulk-unfav" class="btn" title="Remove the selected ROMs from favorites">☆ Unfavorite</button>
+      <button id="bulk-collect" class="btn" title="Add the selected ROMs to a collection">+ Collection</button>
+      <button id="bulk-uncollect" class="btn" title="Remove the selected ROMs from this collection" hidden>− Remove from collection</button>
+      <button id="bulk-download" class="btn">⇩ Download</button>
+      <button id="bulk-delete" class="btn danger">Delete</button>
+    </div>
+    <div id="drop-overlay" class="drop-overlay" hidden><div>Drop files to upload them</div></div>
+  </section>
+
+  <!-- ============================== STATS ============================== -->
+  <section id="tab-stats" class="tab-panel" hidden>
+    <div id="stats-kpis" class="kpis"></div>
+    <div id="stats-empty" class="empty" hidden></div>
+    <div class="cards" id="stats-cards">
+      <article class="card" id="st-top"><h2>Most played</h2><div class="body"></div></article>
+      <article class="card" id="st-recent"><h2>Recently played</h2><div class="body"></div></article>
+      <article class="card" id="st-systems"><h2>Play time by system</h2><div class="body"></div></article>
+      <article class="card" id="st-genres"><h2>Play time by genre</h2><div class="body"></div></article>
+      <article class="card" id="st-progress"><h2>Games played per system</h2><div class="body"></div></article>
+    </div>
+    <p class="hint">Play counts, play time and last played dates are recorded by EmulationStation in each system's gamelist.xml.</p>
+  </section>
+
+  <!-- ============================== SAVES ============================== -->
+  <section id="tab-saves" class="tab-panel" hidden>
+    <div class="toolbar">
+      <input type="search" id="sv-search" placeholder="Search by game or file…" autocomplete="off">
+      <select id="sv-system" title="System"></select>
+      <select id="sv-kind" title="Show">
+        <option value="">All saves</option>
+        <option value="state">With save states</option>
+        <option value="save">With battery saves</option>
+        <option value="orphan">Without a matching ROM</option>
+      </select>
+      <span class="spacer"></span>
+      <a id="sv-backup" class="btn" href="/api/saves/download?all=1" title="Download the whole saves folder as a zip">⇩ Backup all</a>
+      <button id="sv-upload" class="btn primary">⇪ Upload saves</button>
+    </div>
+    <div class="list-head"><div class="breadcrumb"><span>Saves</span></div><div id="sv-info" class="muted"></div></div>
+    <div id="sv-list" class="save-list"></div>
+    <div id="sv-empty" class="empty" hidden></div>
+  </section>
+
+  <!-- =============================== BIOS ============================== -->
+  <section id="tab-bios" class="tab-panel" hidden>
+    <div class="toolbar">
+      <input type="search" id="bi-search" placeholder="Search by system or file…" autocomplete="off">
+      <select id="bi-scope" title="Systems">
+        <option value="roms">Systems with ROMs</option>
+        <option value="all">All systems</option>
+      </select>
+      <select id="bi-status" title="Status">
+        <option value="">Any status</option>
+        <option value="problems">With missing or wrong files</option>
+        <option value="complete">Complete</option>
+      </select>
+      <span class="spacer"></span>
+      <button id="bi-refresh" class="btn" title="Check the files again">⟳ Check again</button>
+      <button id="bi-upload" class="btn primary">⇪ Upload BIOS</button>
+      <input type="file" id="bi-files" multiple hidden>
+    </div>
+    <div id="bi-summary" class="kpis small"></div>
+    <div id="bi-error" class="notice" hidden></div>
+    <div id="bi-list" class="bios-list"></div>
+    <div id="bi-empty" class="empty" hidden></div>
+    <p class="hint"><span id="bi-source"></span> Files and MD5 checksums come from Knulli's BIOS list (batocera-systems, or the bios/readme.txt generated from it). Some systems list several alternative versions and need only one of them. Uploaded files are placed in the folder Knulli expects, recognised by name and checksum.</p>
+    <div id="bi-drop" class="drop-overlay" hidden><div>Drop BIOS files to upload them</div></div>
+  </section>
+
+  <!-- ============================ SCREENSHOTS =========================== -->
+  <section id="tab-shots" class="tab-panel" hidden>
+    <div class="toolbar">
+      <input type="search" id="sh-search" placeholder="Search by game or file…" autocomplete="off">
+      <select id="sh-game" title="Game"></select>
+      <span class="spacer"></span>
+      <button id="sh-refresh" class="btn">⟳ Refresh</button>
+    </div>
+    <div class="list-head">
+      <div class="breadcrumb"><span>Screenshots</span></div><div id="sh-info" class="muted"></div>
+      <span class="spacer"></span><button id="sh-select-all" class="link">Select all</button>
+    </div>
+    <div id="sh-grid" class="shot-grid"></div>
+    <div id="sh-empty" class="empty" hidden></div>
+    <div id="sh-bulk" class="bulkbar" hidden>
+      <span id="sh-bulk-info"></span><span class="spacer"></span>
+      <button id="sh-bulk-clear" class="btn">Clear</button>
+      <button id="sh-bulk-download" class="btn">⇩ Download</button>
+      <button id="sh-bulk-delete" class="btn danger">Delete</button>
+    </div>
+  </section>
+
+  <!-- ============================== REMOTE ============================== -->
+  <section id="tab-remote" class="tab-panel" hidden>
+    <div class="toolbar">
+      <button id="rm-toggle" class="btn primary">❚❚ Pause</button>
+      <select id="rm-fps" title="Frames per second">
+        <option value="2">2 fps</option>
+        <option value="5">5 fps</option>
+        <option value="10">10 fps</option>
+        <option value="15">15 fps</option>
+        <option value="30">30 fps</option>
+      </select>
+      <button id="rm-rotate" class="btn" title="Rotate the image">⟳ Rotate</button>
+      <button id="rm-save" class="btn" title="Save the current image">⇩ Save image</button>
+      <button id="rm-full" class="btn" title="Full screen">⛶ Full screen</button>
+      <span class="spacer"></span>
+      <span id="rm-status" class="muted"></span>
+    </div>
+    <div id="rm-error" class="notice" hidden></div>
+    <div class="remote">
+      <div id="rm-frame" class="rm-frame">
+        <canvas id="rm-canvas" width="640" height="480"></canvas>
+        <div id="rm-placeholder" class="rm-placeholder">Connecting to the screen…</div>
+      </div>
+      <div class="pad-wrap">
+        <div id="rm-pad" class="pad">
+          <div class="pad-row">
+            <div class="pad-group"><button data-btn="l2">L2</button><button data-btn="pageup">L1</button></div>
+            <div class="pad-group"><button data-btn="pagedown">R1</button><button data-btn="r2">R2</button></div>
+          </div>
+          <div class="pad-row">
+            <div class="dpad">
+              <button data-btn="up" class="d-up" aria-label="Up">▲</button>
+              <button data-btn="left" class="d-left" aria-label="Left">◀</button>
+              <button data-btn="right" class="d-right" aria-label="Right">▶</button>
+              <button data-btn="down" class="d-down" aria-label="Down">▼</button>
+            </div>
+            <div class="pad-mid">
+              <div class="pad-group"><button data-btn="select" class="pill">Select</button><button data-btn="start" class="pill">Start</button></div>
+              <button data-btn="hotkey" class="pill">Hotkey</button>
+              <div class="pad-group"><button data-btn="l3" class="pill">L3</button><button data-btn="r3" class="pill">R3</button></div>
+            </div>
+            <div class="face">
+              <button data-btn="x" class="f-up">X</button>
+              <button data-btn="y" class="f-left">Y</button>
+              <button data-btn="a" class="f-right">A</button>
+              <button data-btn="b" class="f-down">B</button>
+            </div>
+          </div>
+        </div>
+        <div id="rm-pad-error" class="hint" hidden></div>
+        <p class="hint">Keyboard: arrows = D-pad · X = A · Z = B · S = X · A = Y · Q / W = L1 / R1 · 1 / 2 = L2 / R2 · Enter = Start · Backspace = Select · H = Hotkey</p>
+      </div>
+    </div>
+    <p class="hint">The buttons act on the device's own controller, with the mapping configured in EmulationStation, so they work in the menus and in games alike.</p>
+  </section>
+</main>
+<footer class="credits">
+  System icons: <a href="https://github.com/KyleBing/retro-game-console-icons" target="_blank" rel="noopener">Retro game console icons</a>
+  by KyleBing, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> (cropped and resized)
+</footer>
+
+<!-- ROM detail -->
+<dialog id="dlg-detail" class="dlg wide">
+  <form method="dialog" class="dlg-close"><button aria-label="Close">✕</button></form>
+  <div id="detail-body"></div>
+</dialog>
+
+<!-- Upload -->
+<dialog id="dlg-upload" class="dlg">
+  <form method="dialog" class="dlg-close"><button aria-label="Close">✕</button></form>
+  <h2>Upload ROMs</h2>
+  <label class="fld">Target system<select id="up-system"></select></label>
+  <div id="up-exts" class="hint"></div>
+  <label id="dropzone" class="dropzone">
+    <input type="file" id="up-files" multiple hidden>
+    <strong>Drag files here</strong> or <span class="link">browse</span>
+  </label>
+  <label class="chk"><input type="checkbox" id="up-overwrite"> Overwrite existing files</label>
+  <ul id="up-queue" class="queue"></ul>
+  <div class="dlg-actions">
+    <span id="up-summary" class="muted"></span>
+    <span class="spacer"></span>
+    <button id="up-clear" class="btn">Clear</button>
+    <button id="up-start" class="btn primary">Start upload</button>
+  </div>
+</dialog>
+
+<!-- Saves of one game -->
+<dialog id="dlg-saves" class="dlg wide">
+  <form method="dialog" class="dlg-close"><button aria-label="Close">✕</button></form>
+  <div id="saves-body"></div>
+</dialog>
+
+<!-- Upload saves -->
+<dialog id="dlg-save-upload" class="dlg">
+  <form method="dialog" class="dlg-close"><button aria-label="Close">✕</button></form>
+  <h2>Upload saves</h2>
+  <label class="fld">Saves folder<select id="su-dir"></select></label>
+  <div class="hint">Files keep their names: a save or state is matched to a game when its name starts with the ROM file name (e.g. <code>Game.srm</code>, <code>Game.state1</code>).</div>
+  <label class="dropzone" id="su-drop"><input type="file" id="su-files" multiple hidden><strong>Drag files here</strong> or <span class="link">browse</span></label>
+  <label class="chk"><input type="checkbox" id="su-overwrite"> Overwrite existing files</label>
+  <ul id="su-queue" class="queue"></ul>
+  <div class="dlg-actions"><span class="spacer"></span><button id="su-cancel" class="btn">Close</button><button id="su-start" class="btn primary">Upload</button></div>
+</dialog>
+
+<!-- Screenshot viewer -->
+<dialog id="dlg-shot" class="dlg viewer">
+  <form method="dialog" class="dlg-close"><button aria-label="Close">✕</button></form>
+  <div id="shot-media" class="shot-media"></div>
+  <button class="nav prev" id="shot-prev" aria-label="Previous">‹</button>
+  <button class="nav next" id="shot-next" aria-label="Next">›</button>
+  <div class="shot-bar">
+    <div id="shot-info"></div><span class="spacer"></span>
+    <button id="shot-game" class="btn">Game details</button>
+    <a id="shot-download" class="btn" download>⇩ Download</a>
+    <button id="shot-delete" class="btn danger">Delete</button>
+  </div>
+</dialog>
+
+<!-- Add to collection -->
+<dialog id="dlg-collect" class="dlg">
+  <form method="dialog" class="dlg-close"><button aria-label="Close">✕</button></form>
+  <h2>Add to collection</h2>
+  <p id="collect-text" class="muted"></p>
+  <div id="collect-list" class="collect-list"></div>
+  <label class="fld">Or create a new collection
+    <input type="text" id="collect-new" placeholder="Collection name" maxlength="64" autocomplete="off">
+  </label>
+  <div class="hint">Letters, digits, spaces and - [ ] ( ) only, as in EmulationStation.</div>
+  <div class="dlg-actions">
+    <span class="spacer"></span>
+    <button id="collect-cancel" class="btn">Cancel</button>
+    <button id="collect-ok" class="btn primary">Add</button>
+  </div>
+</dialog>
+
+<!-- Generic prompt / confirmation -->
+<dialog id="dlg-prompt" class="dlg">
+  <h2 id="prompt-title"></h2>
+  <p id="prompt-text"></p>
+  <input type="text" id="prompt-input" maxlength="64" autocomplete="off">
+  <div id="prompt-hint" class="hint"></div>
+  <div class="dlg-actions">
+    <span class="spacer"></span>
+    <button id="prompt-cancel" class="btn">Cancel</button>
+    <button id="prompt-ok" class="btn primary">OK</button>
+  </div>
+</dialog>
+
+<!-- Delete confirmation -->
+<dialog id="dlg-delete" class="dlg">
+  <h2>Delete ROMs?</h2>
+  <p id="del-text"></p>
+  <ul id="del-list" class="del-list"></ul>
+  <label class="chk"><input type="checkbox" id="del-media" checked> Also delete associated images, videos and manuals</label>
+  <p class="hint">This cannot be undone. The entries will also be removed from gamelist.xml (a .bak copy is saved).</p>
+  <div class="dlg-actions">
+    <span class="spacer"></span>
+    <button id="del-cancel" class="btn">Cancel</button>
+    <button id="del-confirm" class="btn danger">Delete</button>
+  </div>
+</dialog>
+
+<form id="dl-form" method="post" action="/api/download" hidden><input type="hidden" name="ids"></form>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script src="/static/app.js"></script>
+<script src="/static/stats.js"></script>
+<script src="/static/saves.js"></script>
+<script src="/static/bios.js"></script>
+<script src="/static/captures.js"></script>
+<script src="/static/remote.js"></script>
+</body>
+</html>

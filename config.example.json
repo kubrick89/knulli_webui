@@ -1,0 +1,40 @@
+{
+  "_info": "Knulli WebUI configuration. Keys starting with _ are ignored.",
+  "host": "0.0.0.0",
+  "port": 8088,
+  "roms_dir": "/userdata/roms",
+  "userdata_dir": "/userdata",
+  "es_api": "http://127.0.0.1:1234",
+  "es_reload": true,
+  "collections_dir": "/userdata/system/configs/emulationstation/collections",
+  "es_settings_file": "/userdata/system/configs/emulationstation/es_settings.cfg",
+  "saves_dir": "/userdata/saves",
+  "es_savestates_files": [
+    "/userdata/system/configs/emulationstation/es_savestates.cfg",
+    "/usr/share/emulationstation/es_savestates.cfg"
+  ],
+  "bios_db": "/usr/bin/batocera-systems",
+  "bios_readme_files": [
+    "/userdata/bios/readme.txt",
+    "/usr/share/batocera/datainit/bios/readme.txt"
+  ],
+  "screenshots_dir": "/userdata/screenshots",
+  "_screen": "Remote tab: screen_capture = auto | grim | fbdev | command (screen_command prints a PNG/JPEG/BMP on stdout)",
+  "screen_capture": "auto",
+  "screen_command": "",
+  "framebuffer": "/dev/fb0",
+  "screen_jpeg_quality": 70,
+  "allow_remote_control": true,
+  "es_input_files": [
+    "/userdata/system/configs/emulationstation/es_input.cfg",
+    "/usr/share/emulationstation/es_input.cfg"
+  ],
+  "pad_device": "",
+  "_auth": "Set username and password to protect the page with HTTP Basic Auth",
+  "username": "",
+  "password": "",
+  "allow_upload": true,
+  "allow_delete": true,
+  "max_upload_mb": 0,
+  "sample_interval": 2.0
+}

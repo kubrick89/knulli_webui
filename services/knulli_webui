@@ -1,0 +1,61 @@
+#!/bin/bash
+# Batocera/Knulli service for Knulli WebUI.
+# Copy it to /userdata/system/services/ and manage it with:
+#   batocera-services enable|disable|start|stop knulli_webui
+# or from the System Settings > Services menu.
+
+APP_DIR="/userdata/system/knulli-webui"
+PIDFILE="/var/run/knulli_webui.pid"
+LOGFILE="/userdata/system/logs/knulli-webui.log"
+PYTHON="$(command -v python3 || command -v python)"
+
+is_running() {
+    [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
+}
+
+start() {
+    if is_running; then
+        echo "knulli_webui already running (pid $(cat "$PIDFILE"))"
+        return 0
+    fi
+    if [ -z "$PYTHON" ]; then
+        echo "python3 not found" >&2
+        return 1
+    fi
+    mkdir -p "$(dirname "$LOGFILE")"
+    # Keep the log under 1 MB
+    if [ -f "$LOGFILE" ] && [ "$(stat -c %s "$LOGFILE" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+        mv -f "$LOGFILE" "$LOGFILE.1"
+    fi
+    # Low priority so emulation is not disturbed
+    nohup nice -n 10 "$PYTHON" "$APP_DIR/webui.py" --config "$APP_DIR/config.json" >>"$LOGFILE" 2>&1 &
+    echo $! > "$PIDFILE"
+    sleep 1
+    if is_running; then
+        echo "knulli_webui started (pid $(cat "$PIDFILE"))"
+    else
+        echo "knulli_webui failed to start, see $LOGFILE" >&2
+        rm -f "$PIDFILE"
+        return 1
+    fi
+}
+
+stop() {
+    if is_running; then
+        kill "$(cat "$PIDFILE")" 2>/dev/null
+        for _ in 1 2 3 4 5; do is_running || break; sleep 1; done
+        is_running && kill -9 "$(cat "$PIDFILE")" 2>/dev/null
+        echo "knulli_webui stopped"
+    fi
+    rm -f "$PIDFILE"
+}
+
+case "$1" in
+    start) start ;;
+    stop) stop ;;
+    restart) stop; start ;;
+    status)
+        if is_running; then echo "running (pid $(cat "$PIDFILE"))"; exit 0; fi
+        echo "stopped"; exit 1 ;;
+    *) echo "usage: $0 {start|stop|restart|status}"; exit 1 ;;
+esac
