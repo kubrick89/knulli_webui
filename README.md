@@ -1,6 +1,8 @@
 # Knulli WebUI
 
-A web service for devices running **Knulli OS** (and Batocera in general) that serves, on port **8088**, a page (in English) with seven tabs:
+**DISCLAIMER: This WHOLE project has been vibecoded**
+
+A web service for devices running **Knulli OS** that serves, on port **8088**, a Web Managment console with seven tabs:
 
 - **Dashboard**: real-time telemetry (per-core CPU usage and frequencies, GPU/devfreq, RAM and swap, temperatures, battery and charger, network and Wi-Fi, storage volumes, the running game or emulator) with charts of the last few minutes.
 - **ROMs**: a library with four views (**By system**, **Favorites**, **Collections**, **All**), search, sorting, grid or table layout, and filters on the `gamelist.xml` metadata (system, collection, genre, developer, publisher, region, year, players, rating, play history, presence of metadata or images, hidden games), plus **favorites management** (add and remove, single or multiple), **EmulationStation collections** (create, rename, delete, show/hide, add and remove ROMs), **upload**, **download** (single file or multi-ROM zip) and **deletion** of ROMs.
@@ -15,31 +17,27 @@ It has no dependencies: it only uses the Python 3 already present on the system 
 ## Installing on the device
 
 1. Enable networking and SSH on Knulli (default credentials: `root` / `linux`).
-2. From the project root, copy everything to the device:
-   ```sh
-   scp -r . root@<device-ip>:/userdata/system/knulli-webui-src
-   ```
-   Alternatively you can copy it through the network share `\\KNULLI\share\system\`.
+2. Copy the content of the zip in /userdata/knulli_webui (create the folder)
 3. Install:
    ```sh
    ssh root@<device-ip>
-   sh /userdata/system/knulli-webui-src/install.sh
+   sh /userdata/knulli_webui/install.sh
    ```
 4. Open `http://<device-ip>:8088`.
 
-The installer copies the application to `/userdata/system/knulli-webui/` and the service to `/userdata/system/services/knulli_webui`, then enables and starts it with `batocera-services`. The service therefore starts at every boot and can also be turned on or off from the EmulationStation **System Settings → Services** menu.
+The installer copies the application to `/userdata/system/knulli-webui/` and the service to `/userdata/system/services/knulli_webui`, then enables and starts it with `knulli-services`. The service therefore starts at every boot and can also be turned on or off from the EmulationStation **System Settings → Services** menu.
 
 Useful commands:
 
 ```sh
-batocera-services start|stop|status knulli_webui
+knulli-services start|stop|status knulli_webui
 tail -f /userdata/system/logs/knulli-webui.log
 sh /userdata/system/knulli-webui-src/install.sh --uninstall
 ```
 
 To update, copy the new version and run `install.sh` again. The existing `config.json` is kept.
 
-> If your version has no `batocera-services`, the installer starts the service directly. To start it automatically at boot, add `/userdata/system/services/knulli_webui start` to `/userdata/system/custom.sh`.
+> If your version has no `knulli-services`, the installer starts the service directly. To start it automatically at boot, add `/userdata/system/services/knulli_webui start` to `/userdata/system/custom.sh`.
 
 ## Configuration
 
@@ -68,8 +66,6 @@ To update, copy the new version and run `install.sh` again. The existing `config
 | `allow_remote_control` | `true` | Enable the virtual controller of the **Remote** tab |
 | `es_input_files` | user, then system `es_input.cfg` | EmulationStation's controller configurations, used to find the controller and its mapping |
 | `pad_device` | empty | Force the controller's event node (e.g. `/dev/input/event1`) |
-
-After a change: `batocera-services stop knulli_webui && batocera-services start knulli_webui`.
 
 ## How it works
 
