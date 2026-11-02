@@ -16,7 +16,7 @@ It has no dependencies: it only uses the Python 3 already present on the system 
 
 ## Installing on the device
 
-1. Get the latest release from the (here)[https://github.com/kubrick89/knulli_webui/releases] 
+1. Get the latest release from the [here](https://github.com/kubrick89/knulli_webui/releases)
 1. Enable networking and SSH on Knulli (default credentials: `root` / `linux`).
 2. Copy the content of the zip in /userdata/knulli_webui (create the folder)
 3. Install:
