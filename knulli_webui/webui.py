@@ -96,9 +96,15 @@ DEFAULT_CONFIG = {
     ],
     # Force the controller's event node (e.g. "/dev/input/event1") instead of matching es_input.cfg
     "pad_device": "",
-    # HTTP Basic authentication: leave empty to disable it
+    # HTTP Basic authentication: leave empty to disable it. The page stores a salted hash
+    # (password_hash) when credentials are set from it; a plain password also works
     "username": "",
     "password": "",
+    "password_hash": "",
+    # Ask on the page to set up credentials while authentication is disabled
+    "auth_prompt": True,
+    # Page theme: "auto" (follows the browser), "light" or "dark"
+    "theme": "auto",
     "allow_upload": True,
     "allow_delete": True,
     # 0 = no limit
@@ -133,6 +139,30 @@ def run_cmd(args, timeout=2):
         return res.stdout.strip() if res.returncode == 0 else ""
     except (OSError, subprocess.SubprocessError):
         return ""
+
+
+PASSWORD_ITERATIONS = 100000
+
+
+def hash_password(password):
+    salt = os.urandom(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PASSWORD_ITERATIONS)
+    return "pbkdf2_sha256$%d$%s$%s" % (PASSWORD_ITERATIONS, salt.hex(), digest.hex())
+
+
+def check_password(password, stored):
+    try:
+        algo, iterations, salt, digest = stored.split("$")
+        if algo != "pbkdf2_sha256":
+            return False
+        calc = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt), int(iterations))
+    except ValueError:
+        return False
+    return hmac.compare_digest(calc.hex(), digest)
+
+
+def auth_enabled(cfg):
+    return bool(cfg.get("username") or cfg.get("password") or cfg.get("password_hash"))
 
 
 def is_within(path, root):
@@ -2255,8 +2285,12 @@ class Pad:
 # --------------------------------------------------------------------------
 
 class App:
-    def __init__(self, cfg):
+    def __init__(self, cfg, config_path=None):
         self.cfg = cfg
+        self.config_path = config_path
+        self._config_lock = threading.Lock()
+        # Authorization headers already verified: hashing the password on every request is slow
+        self.auth_cache = set()
         self.telemetry = Telemetry(cfg)
         self.library = Library(cfg)
         self.collections = Collections(cfg, self.library)
@@ -2301,6 +2335,32 @@ class App:
             self._restart_pid, self._pending = None, {}
             return False
 
+    def save_config(self, updates):
+        """Write `updates` to config.json (keeping the other keys) and apply them right away."""
+        if not self.config_path:
+            raise HttpError(409, "the service was started without a configuration file")
+        with self._config_lock:
+            try:
+                with open(self.config_path, encoding="utf-8") as f:
+                    data = json.load(f)
+            except FileNotFoundError:
+                data = {}
+            except (OSError, ValueError) as e:
+                raise HttpError(500, "cannot read %s: %s" % (self.config_path, e))
+            data.update(updates)
+            tmp = self.config_path + ".tmp"
+            try:
+                # it may hold the credentials: readable by root only
+                fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                    f.write("\n")
+                os.replace(tmp, self.config_path)
+            except OSError as e:
+                raise HttpError(500, "cannot write %s: %s" % (self.config_path, e.strerror or e))
+            self.cfg.update(updates)
+            self.auth_cache.clear()
+
     def es_reload(self, force=False):
         if not (force or self.cfg.get("es_reload")):
             return
@@ -2344,17 +2404,29 @@ class Handler(BaseHTTPRequestHandler):
         log.info("%s - %s", self.address_string(), fmt % args)
 
     def _auth_ok(self):
-        user, pwd = self.app.cfg.get("username") or "", self.app.cfg.get("password") or ""
-        if not user and not pwd:
+        cfg = self.app.cfg
+        if not auth_enabled(cfg):
             return True
         header = self.headers.get("Authorization", "")
         if not header.startswith("Basic "):
             return False
+        key = hashlib.sha256(header.encode("utf-8", "replace")).digest()
+        if key in self.app.auth_cache:
+            return True
         try:
             u, _, p = base64.b64decode(header[6:]).decode("utf-8").partition(":")
         except (ValueError, UnicodeDecodeError):
             return False
-        return hmac.compare_digest(u.encode(), user.encode()) & hmac.compare_digest(p.encode(), pwd.encode())
+        user = cfg.get("username") or ""
+        if cfg.get("password_hash"):
+            ok = hmac.compare_digest(u.encode(), user.encode()) & check_password(p, cfg["password_hash"])
+        else:
+            ok = hmac.compare_digest(u.encode(), user.encode()) & hmac.compare_digest(p.encode(), (cfg.get("password") or "").encode())
+        if ok:
+            if len(self.app.auth_cache) > 32:
+                self.app.auth_cache.clear()
+            self.app.auth_cache.add(key)
+        return ok
 
     def _dispatch(self, method):
         url = urllib.parse.urlsplit(self.path)
@@ -2428,6 +2500,9 @@ class Handler(BaseHTTPRequestHandler):
             body = f.read()
         if rel == "index.html":
             body = versioned_assets(body)
+            # applied before the CSS loads, so the page does not flash in the other theme
+            if self.app.cfg.get("theme") in ("light", "dark"):
+                body = body.replace(b'<html lang="en">', b'<html lang="en" data-theme="%s">' % self.app.cfg["theme"].encode(), 1)
         self.send_response(200)
         self.send_header("Content-Type", mime_for(full))
         self.send_header("Content-Length", str(len(body)))
@@ -2497,6 +2572,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"version": VERSION, "allowUpload": bool(cfg["allow_upload"]),
                         "allowDelete": bool(cfg["allow_delete"]), "maxUploadMb": cfg["max_upload_mb"],
                         "allowRemoteControl": bool(cfg["allow_remote_control"]),
+                        "theme": cfg.get("theme") or "auto", "authEnabled": auth_enabled(cfg),
+                        "authPrompt": bool(cfg.get("auth_prompt")) and not auth_enabled(cfg),
+                        "canSaveConfig": bool(self.app.config_path),
                         "hostname": socket.gethostname()})
 
     def api_telemetry(self):
@@ -2734,6 +2812,36 @@ class Handler(BaseHTTPRequestHandler):
             pass  # ES closed the connection while quitting
         except Exception as e:
             raise HttpError(502, "EmulationStation did not answer: %s" % e)
+        self.send_json({"ok": True})
+
+    # -- settings --------------------------------------------------------------
+
+    def api_settings(self):
+        data = self.read_json()
+        updates = {}
+        if "theme" in data:
+            if data["theme"] not in ("auto", "light", "dark"):
+                raise HttpError(400, "theme must be auto, light or dark")
+            updates["theme"] = data["theme"]
+        if "authPrompt" in data:
+            updates["auth_prompt"] = bool(data["authPrompt"])
+        if not updates:
+            raise HttpError(400, "nothing to change")
+        self.app.save_config(updates)
+        self.send_json({"ok": True})
+
+    def api_auth_setup(self):
+        # Only to turn authentication on: once it is enabled, credentials are changed in config.json
+        if auth_enabled(self.app.cfg):
+            raise HttpError(409, "authentication is already enabled")
+        data = self.read_json()
+        user, pwd = str(data.get("username") or "").strip(), str(data.get("password") or "")
+        if not user or len(user) > 64 or ":" in user:
+            raise HttpError(400, "the username must be 1 to 64 characters, without ':'")
+        if len(pwd) < 4:
+            raise HttpError(400, "the password must be at least 4 characters long")
+        self.app.save_config({"username": user, "password": "", "password_hash": hash_password(pwd)})
+        log.warning("HTTP authentication enabled for user %s", user)
         self.send_json({"ok": True})
 
     # -- live screen and remote control --------------------------------------
@@ -2977,6 +3085,8 @@ ROUTES = {
     ("GET", "/api/screen"): (Handler.api_screen, False),
     ("GET", "/api/screen/frame"): (Handler.api_screen_frame, False),
     ("POST", "/api/pad"): (Handler.api_pad, True),
+    ("POST", "/api/settings"): (Handler.api_settings, True),
+    ("POST", "/api/auth-setup"): (Handler.api_auth_setup, True),
 }
 
 
@@ -2993,8 +3103,8 @@ def load_config(path):
     return cfg
 
 
-def make_server(cfg):
-    app = App(cfg)
+def make_server(cfg, config_path=None):
+    app = App(cfg, config_path)
     handler = type("BoundHandler", (Handler,), {"app": app})
     server = ThreadingHTTPServer((cfg["host"], int(cfg["port"])), handler)
     server.daemon_threads = True
@@ -3024,7 +3134,7 @@ def main():
 
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING,
                         format="%(asctime)s %(levelname)s %(message)s")
-    server = make_server(cfg)
+    server = make_server(cfg, args.config)
     server.app.telemetry.start()
     server.app.library.warm_up()
 

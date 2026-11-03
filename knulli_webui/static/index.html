@@ -23,6 +23,7 @@
     <button class="tab" role="tab" data-tab="shots">Screenshots</button>
     <button class="tab" role="tab" data-tab="remote">Remote</button>
   </nav>
+  <button id="theme-toggle" class="theme-toggle" title="Switch theme" aria-label="Switch theme"></button>
   <div id="conn" class="conn" title="Connection status"><span class="dot"></span><span id="conn-text">…</span></div>
 </header>
 
@@ -146,7 +147,6 @@
       <article class="card" id="st-recent"><h2>Recently played</h2><div class="body"></div></article>
       <article class="card" id="st-systems"><h2>Play time by system</h2><div class="body"></div></article>
       <article class="card" id="st-genres"><h2>Play time by genre</h2><div class="body"></div></article>
-      <article class="card" id="st-progress"><h2>Games played per system</h2><div class="body"></div></article>
     </div>
     <p class="hint">Play counts, play time and last played dates are recorded by EmulationStation in each system's gamelist.xml.</p>
   </section>
@@ -353,6 +353,24 @@
     <button id="collect-cancel" class="btn">Cancel</button>
     <button id="collect-ok" class="btn primary">Add</button>
   </div>
+</dialog>
+
+<!-- Authentication setup, offered while it is disabled -->
+<dialog id="dlg-auth" class="dlg">
+  <h2>Protect Knulli WebUI</h2>
+  <p class="muted">Anyone on your network can open this page and delete ROMs, saves and screenshots. Set a username and password: they are saved in config.json and asked by the browser from the next login on.</p>
+  <form id="auth-form" class="auth-form">
+    <label class="fld">Username<input type="text" id="auth-user" maxlength="64" autocomplete="username" required></label>
+    <label class="fld">Password<input type="password" id="auth-pass" minlength="4" autocomplete="new-password" required></label>
+    <label class="fld">Repeat the password<input type="password" id="auth-pass2" minlength="4" autocomplete="new-password" required></label>
+    <div id="auth-error" class="hint err" hidden></div>
+    <div class="dlg-actions">
+      <button type="button" id="auth-never" class="link">Don't ask again</button>
+      <span class="spacer"></span>
+      <button type="button" id="auth-later" class="btn">Later</button>
+      <button type="submit" class="btn primary">Enable authentication</button>
+    </div>
+  </form>
 </dialog>
 
 <!-- Generic prompt / confirmation -->

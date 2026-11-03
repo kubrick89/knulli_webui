@@ -16,13 +16,20 @@
   --shadow: 0 6px 24px rgba(0, 0, 0, .25);
   color-scheme: dark;
 }
+/* Light theme: chosen with the toggle (data-theme="light"), or by the system when none is chosen */
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="dark"]) {
     --bg: #f3f4f8; --bg-2: #e9ebf2; --card: #ffffff; --card-2: #f4f5fa; --line: #dde0ea;
     --text: #1b1e27; --muted: #6a7187; --accent: #6544f5; --accent-2: #5a3be0;
     --shadow: 0 4px 18px rgba(30, 35, 60, .08);
     color-scheme: light;
   }
+}
+:root[data-theme="light"] {
+  --bg: #f3f4f8; --bg-2: #e9ebf2; --card: #ffffff; --card-2: #f4f5fa; --line: #dde0ea;
+  --text: #1b1e27; --muted: #6a7187; --accent: #6544f5; --accent-2: #5a3be0;
+  --shadow: 0 4px 18px rgba(30, 35, 60, .08);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -53,6 +60,9 @@ button, input, select { font: inherit; color: inherit; }
 .tabs { display: flex; gap: 4px; margin: 0 auto; background: var(--bg-2); padding: 4px; border-radius: 10px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 .tab { border: 0; background: transparent; padding: 7px 16px; border-radius: 7px; cursor: pointer; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .tab.active { background: var(--accent); color: #fff; }
+.theme-toggle { border: 1px solid var(--line); background: var(--bg-2); color: var(--muted); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: grid; place-items: center; padding: 0; flex: none; }
+.theme-toggle:hover { color: var(--text); border-color: var(--accent); }
+.theme-toggle svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .conn { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .conn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .conn.ok .dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
@@ -106,7 +116,7 @@ main { padding: 20px; max-width: 1600px; margin: 0 auto; }
 .segmented button { border: 0; background: transparent; padding: 6px 12px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 600; }
 .segmented button.active { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.2); }
 .toolbar input[type=search] { flex: 1 1 220px; min-width: 160px; }
-input[type=search], input[type=number], input[type=text], select {
+input[type=search], input[type=number], input[type=text], input[type=password], select {
   background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-width: 0;
 }
 input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -177,7 +187,9 @@ a.btn { text-decoration: none; display: inline-block; }
 .collect-item:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .collect-item input { accent-color: var(--accent); margin: 0; }
 .collect-item .t { font-weight: 600; flex: 1; }
-.dlg .fld input[type=text], #prompt-input { width: 100%; }
+.dlg .fld input[type=text], .dlg .fld input[type=password], #prompt-input { width: 100%; }
+.hint.err { color: var(--crit); }
+.auth-form { display: flex; flex-direction: column; gap: 12px; margin: 14px 0 4px; }
 #prompt-input { margin-top: 6px; }
 .credits a { color: inherit; }
 

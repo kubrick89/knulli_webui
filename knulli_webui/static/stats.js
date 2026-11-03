@@ -91,15 +91,6 @@ const Stats = {
       label: `<span class="hb-name">${esc(genre)}</span>`, value: g.value, text: fmtMeasure(g.value), title: `${genre}: ${g.games} games played`,
     }));
     $('#st-genres .body').innerHTML = barList(genreRows);
-
-    const progress = Roms.systems.filter((s) => s.count > 0).map((s) => {
-      const n = played.filter((r) => r.system === s.name).length;
-      return { s, n, pct: (100 * n) / s.count };
-    }).filter((x) => x.n > 0).sort((a, b) => b.pct - a.pct || b.n - a.n).slice(0, 10);
-    $('#st-progress .body').innerHTML = barList(progress.map(({ s, n, pct }) => ({
-      label: `${sysIcon(s.name, 'sys-ico sm')}<span class="hb-name">${esc(s.fullname)}</span>`,
-      value: pct, text: `${n} / ${s.count}`, title: `${s.fullname}: ${n} of ${s.count} games played (${Math.round(pct)}%)`,
-    })));
   },
 };
 

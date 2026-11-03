@@ -94,6 +94,75 @@ function promptDialog({ title, text = '', value = null, hint = '', ok = 'OK', da
   });
 }
 
+/* ======================================================================
+ * Theme and authentication setup (both saved in config.json)
+ * ==================================================================== */
+const ICON_SUN = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const ICON_MOON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+const Theme = {
+  /* The theme shown now: the one chosen, or the system's when it is "auto" */
+  current() {
+    const t = document.documentElement.dataset.theme;
+    return t === 'light' || t === 'dark' ? t : systemDark.matches ? 'dark' : 'light';
+  },
+
+  apply(theme) {
+    if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+    else delete document.documentElement.dataset.theme;
+    const dark = this.current() === 'dark';
+    $('#theme-toggle').innerHTML = dark ? ICON_SUN : ICON_MOON;
+    $('#theme-toggle').title = dark ? 'Switch to the light theme' : 'Switch to the dark theme';
+  },
+
+  async toggle() {
+    const before = document.documentElement.dataset.theme;
+    const theme = this.current() === 'dark' ? 'light' : 'dark';
+    this.apply(theme);
+    try {
+      await api('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme }) });
+    } catch (e) {
+      toast('Could not save the theme: ' + e.message, 'err');
+      this.apply(before);
+    }
+  },
+};
+
+const AuthSetup = {
+  show() {
+    $('#auth-error').hidden = true;
+    $('#dlg-auth').showModal();
+    $('#auth-user').focus();
+  },
+
+  error(msg) { $('#auth-error').textContent = msg; $('#auth-error').hidden = false; },
+
+  async submit() {
+    const username = $('#auth-user').value.trim(), password = $('#auth-pass').value;
+    if (username.includes(':')) return this.error('The username cannot contain ":".');
+    if (password !== $('#auth-pass2').value) return this.error('The two passwords do not match.');
+    try {
+      await api('/api/auth-setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+    } catch (e) {
+      return this.error(e.message);
+    }
+    $('#dlg-auth').close();
+    toast('Authentication enabled: log in with the new credentials', 'ok');
+    // the browser asks for the credentials as soon as the server answers 401
+    setTimeout(() => location.reload(), 1500);
+  },
+
+  async never() {
+    try {
+      await api('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ authPrompt: false }) });
+      $('#dlg-auth').close();
+    } catch (e) {
+      this.error(e.message);
+    }
+  },
+};
+
 function setConn(ok, text) {
   $('#conn').className = 'conn ' + (ok ? 'ok' : 'err');
   $('#conn-text').textContent = text;
@@ -1130,6 +1199,12 @@ const Upload = {
  * Events
  * ==================================================================== */
 function bind() {
+  $('#theme-toggle').addEventListener('click', () => Theme.toggle());
+  systemDark.addEventListener('change', () => Theme.apply(document.documentElement.dataset.theme));
+  $('#auth-form').addEventListener('submit', (e) => { e.preventDefault(); AuthSetup.submit(); });
+  $('#auth-later').addEventListener('click', () => $('#dlg-auth').close());
+  $('#auth-never').addEventListener('click', () => AuthSetup.never());
+
   $$('.tab').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
   window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
 
@@ -1292,8 +1367,10 @@ function bind() {
 
 async function init() {
   bind();
+  Theme.apply(document.documentElement.dataset.theme);
   try {
     App.config = await api('/api/config');
+    Theme.apply(App.config.theme);
     $('#hostname').textContent = '· ' + App.config.hostname;
     $('#btn-upload').hidden = !App.config.allowUpload;
     setConn(true, 'Connected');
@@ -1301,6 +1378,7 @@ async function init() {
     setConn(false, 'Disconnected');
   }
   showTab(location.hash.slice(1) || 'dashboard');
+  if (App.config.authPrompt && App.config.canSaveConfig) AuthSetup.show();
 }
 
 // The feature scripts (stats.js, saves.js, bios.js, captures.js, remote.js) load after this one

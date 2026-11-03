@@ -617,6 +617,65 @@ class PadMappingTests(unittest.TestCase):
         self.assertEqual(events, [(webui.EV_KEY, 310, 1), (0, 0, 0), (webui.EV_KEY, 310, 0), (0, 0, 0)])
 
 
+class SettingsTests(WebUITest):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.config_path = os.path.join(cls.tmp, "config.json")
+        with open(cls.config_path, "w") as f:
+            json.dump({"_info": "kept", "port": 8088}, f)
+        cls.server.app.config_path = cls.config_path
+
+    def saved(self):
+        with open(self.config_path) as f:
+            return json.load(f)
+
+    def basic(self, user, pwd):
+        return {"Authorization": "Basic " + base64.b64encode(("%s:%s" % (user, pwd)).encode()).decode()}
+
+    def post(self, path, data, headers=None):
+        return self.jreq(path, data=json.dumps(data).encode(), headers=headers)
+
+    def test_1_theme(self):
+        self.assertEqual(self.jreq("/api/config")[1]["theme"], "auto")
+        self.assertNotIn(b"data-theme", self.req("/")[1])
+        self.assertEqual(self.post("/api/settings", {"theme": "dark"})[0], 200)
+        self.assertEqual(self.saved(), {"_info": "kept", "port": 8088, "theme": "dark"})
+        self.assertIn(b'<html lang="en" data-theme="dark">', self.req("/")[1])
+        self.assertEqual(self.jreq("/api/config")[1]["theme"], "dark")
+        self.assertEqual(self.post("/api/settings", {"theme": "purple"})[0], 400)
+        self.assertEqual(self.req("/api/settings", data=b'{"theme": "light"}', csrf=False)[0], 403)
+
+    def test_2_auth_prompt_flag(self):
+        cfg = self.jreq("/api/config")[1]
+        self.assertTrue(cfg["authPrompt"] and cfg["canSaveConfig"] and not cfg["authEnabled"])
+        self.post("/api/settings", {"authPrompt": False})
+        self.assertFalse(self.jreq("/api/config")[1]["authPrompt"])
+        self.assertIs(self.saved()["auth_prompt"], False)
+
+    def test_3_auth_setup(self):
+        self.assertEqual(self.post("/api/auth-setup", {"username": "a:b", "password": "secret"})[0], 400)
+        self.assertEqual(self.post("/api/auth-setup", {"username": "admin", "password": "123"})[0], 400)
+        self.assertEqual(self.post("/api/auth-setup", {"username": "admin", "password": "secret"})[0], 200)
+        saved = self.saved()
+        self.assertEqual((saved["username"], saved["password"]), ("admin", ""))
+        self.assertTrue(saved["password_hash"].startswith("pbkdf2_sha256$"))
+        self.assertNotIn("secret", open(self.config_path).read())
+        self.assertEqual(os.stat(self.config_path).st_mode & 0o777, 0o600)
+        # active right away: the next request needs the credentials
+        self.assertEqual(self.req("/api/config")[0], 401)
+        self.assertEqual(self.req("/api/config", headers=self.basic("admin", "wrong"))[0], 401)
+        self.assertEqual(self.req("/api/config", headers=self.basic("admin", "secret"))[0], 200)
+        self.assertEqual(self.req("/api/config", headers=self.basic("admin", "secret"))[0], 200)  # cached
+        # it only turns authentication on: changing the credentials is not possible from the page
+        status, _ = self.post("/api/auth-setup", {"username": "evil", "password": "secret"}, self.basic("admin", "secret"))
+        self.assertEqual(status, 409)
+        # the saved hash also works after a restart
+        cfg = webui.load_config(self.config_path)
+        self.assertTrue(webui.check_password("secret", cfg["password_hash"]))
+        self.assertFalse(webui.check_password("Secret", cfg["password_hash"]))
+
+
 class AuthTests(WebUITest):
     auth = ("admin", "secret")
 
